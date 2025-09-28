@@ -1,7 +1,5 @@
-// config/passport.js
 const LocalStrategy = require('passport-local').Strategy;
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const mongoose = require('mongoose');
+// const GoogleStrategy = require('passport-google-oauth20').Strategy; // 🚫 Disabled for now
 const bcrypt = require('bcryptjs');
 const User = require('../models/user'); // ✅ lowercase
 
@@ -23,7 +21,8 @@ module.exports = function (passport) {
     })
   );
 
-  // Google OAuth Strategy
+  // 🚫 Google OAuth Strategy disabled until you add GOOGLE_CLIENT_ID & GOOGLE_CLIENT_SECRET
+  /*
   passport.use(
     new GoogleStrategy(
       {
@@ -51,6 +50,7 @@ module.exports = function (passport) {
       }
     )
   );
+  */
 
   passport.serializeUser((user, done) => {
     done(null, user.id);
@@ -62,4 +62,5 @@ module.exports = function (passport) {
       .catch(err => done(err));
   });
 };
+
 

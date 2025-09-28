@@ -2,34 +2,27 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const { body, validationResult } = require('express-validator');
-const passport = require('passport');
-const User = require('../models/user');
+const User = require('../models/user'); 
 const { ensureAuth } = require('../middleware/auth');
 
-/**
- * @desc Register new user (Local)
- * @route POST /users/register
- */
+// @desc Register new user
+// @route POST /users/register
 router.post(
   '/register',
   [
     body('username').notEmpty().withMessage('Username is required'),
     body('email').isEmail().withMessage('Valid email is required'),
-    body('password')
-      .isLength({ min: 6 })
-      .withMessage('Password must be at least 6 characters')
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
   ],
   async (req, res) => {
     const errors = validationResult(req);
-    if (!errors.isEmpty())
-      return res.status(400).json({ errors: errors.array() });
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     try {
       const { username, email, password } = req.body;
 
       const existingUser = await User.findOne({ email });
-      if (existingUser)
-        return res.status(400).json({ message: 'User already exists' });
+      if (existingUser) return res.status(400).json({ message: 'User already exists' });
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -43,24 +36,22 @@ router.post(
       await newUser.save();
       res.status(201).json({ message: '✅ User registered successfully' });
     } catch (err) {
-      res
-        .status(500)
-        .json({ message: '❌ Error registering user', error: err.message });
+      res.status(500).json({ message: '❌ Error registering user', error: err.message });
     }
   }
 );
 
-/**
- * @desc Login user (Local)
- * @route POST /users/login
- */
+// @desc Login user
+// @route POST /users/login
 router.post(
   '/login',
-  [body('email').isEmail(), body('password').notEmpty()],
+  [
+    body('email').isEmail(),
+    body('password').notEmpty()
+  ],
   async (req, res) => {
     const errors = validationResult(req);
-    if (!errors.isEmpty())
-      return res.status(400).json({ errors: errors.array() });
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     try {
       const { email, password } = req.body;
@@ -68,25 +59,17 @@ router.post(
       if (!user) return res.status(400).json({ message: 'User not found' });
 
       const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch)
-        return res.status(400).json({ message: 'Invalid credentials' });
+      if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
-      res.json({
-        message: '✅ Login successful',
-        user: { id: user._id, email: user.email }
-      });
+      res.json({ message: '✅ Login successful', user: { id: user._id, email: user.email } });
     } catch (err) {
-      res
-        .status(500)
-        .json({ message: '❌ Error logging in', error: err.message });
+      res.status(500).json({ message: '❌ Error logging in', error: err.message });
     }
   }
 );
 
-/**
- * @desc Update user
- * @route PUT /users/:id
- */
+// @desc Update user
+// @route PUT /users/:id
 router.put(
   '/:id',
   ensureAuth,
@@ -97,8 +80,7 @@ router.put(
   ],
   async (req, res) => {
     const errors = validationResult(req);
-    if (!errors.isEmpty())
-      return res.status(400).json({ errors: errors.array() });
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     try {
       const updates = { ...req.body };
@@ -106,26 +88,18 @@ router.put(
         updates.password = await bcrypt.hash(updates.password, 10);
       }
 
-      const updatedUser = await User.findByIdAndUpdate(
-        req.params.id,
-        updates,
-        { new: true }
-      );
+      const updatedUser = await User.findByIdAndUpdate(req.params.id, updates, { new: true });
       if (!updatedUser) return res.status(404).json({ message: 'User not found' });
 
       res.json({ message: '✅ User updated', user: updatedUser });
     } catch (err) {
-      res
-        .status(500)
-        .json({ message: '❌ Error updating user', error: err.message });
+      res.status(500).json({ message: '❌ Error updating user', error: err.message });
     }
   }
 );
 
-/**
- * @desc Delete user
- * @route DELETE /users/:id
- */
+// @desc Delete user
+// @route DELETE /users/:id
 router.delete('/:id', ensureAuth, async (req, res) => {
   try {
     const deletedUser = await User.findByIdAndDelete(req.params.id);
@@ -133,41 +107,8 @@ router.delete('/:id', ensureAuth, async (req, res) => {
 
     res.json({ message: '✅ User deleted' });
   } catch (err) {
-    res
-      .status(500)
-      .json({ message: '❌ Error deleting user', error: err.message });
+    res.status(500).json({ message: '❌ Error deleting user', error: err.message });
   }
-});
-
-/**
- * @desc Google OAuth login
- * @route GET /users/auth/google
- */
-router.get(
-  '/auth/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-);
-
-/**
- * @desc Google OAuth callback
- * @route GET /users/auth/google/callback
- */
-router.get(
-  '/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/' }),
-  (req, res) => {
-    res.json({ message: '✅ Logged in with Google', user: req.user });
-  }
-);
-
-/**
- * @desc Logout
- * @route GET /users/logout
- */
-router.get('/logout', (req, res) => {
-  req.logout(() => {
-    res.json({ message: '✅ Logged out' });
-  });
 });
 
 module.exports = router;
