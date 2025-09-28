@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
-const itemRoutes = require('./routes/itemRoutes'); // Correct capitalization
+const itemRoutes = require('./routes/itemroutes'); // Correct capitalization
 const userRoutes = require('./routes/userRoutes'); // Correct capitalization
 const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger.json');
