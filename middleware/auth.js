@@ -8,10 +8,11 @@
 module.exports = {
   ensureAuth: (req, res, next) => {
     if (req.isAuthenticated && req.isAuthenticated()) {
-      // User is authenticated, proceed to the route
+      // User is authenticated, proceed
       return next();
     }
-    // User is not authenticated, return 401 Unauthorized
+    // User is not authenticated
     return res.status(401).json({ error: "Unauthorized: Login required" });
   }
 };
+
