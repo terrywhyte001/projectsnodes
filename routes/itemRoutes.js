@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { body, validationResult } = require('express-validator');
-const Item = require('../models/Item'); // your Item model
+const Item = require('../models/item'); // your Item model
 const { ensureAuth } = require('../middleware/auth');
 
 // GET all items
