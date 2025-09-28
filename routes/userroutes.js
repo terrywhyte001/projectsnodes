@@ -1,78 +1,172 @@
 // routes/userroutes.js
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
+const { body, validationResult } = require('express-validator');
 const passport = require('passport');
-const User = require('../models/user'); // ✅ lowercase
+const User = require('../models/user');
+const { ensureAuth } = require('../middleware/auth');
 
-// @desc Register new user
-// @route POST /users/register
-router.post('/register', async (req, res) => {
+/**
+ * @desc Register new user (Local)
+ * @route POST /users/register
+ */
+router.post(
+  '/register',
+  [
+    body('username').notEmpty().withMessage('Username is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('password')
+      .isLength({ min: 6 })
+      .withMessage('Password must be at least 6 characters')
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty())
+      return res.status(400).json({ errors: errors.array() });
+
+    try {
+      const { username, email, password } = req.body;
+
+      const existingUser = await User.findOne({ email });
+      if (existingUser)
+        return res.status(400).json({ message: 'User already exists' });
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const newUser = new User({
+        username,
+        email,
+        password: hashedPassword,
+        role: 'user'
+      });
+
+      await newUser.save();
+      res.status(201).json({ message: '✅ User registered successfully' });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ message: '❌ Error registering user', error: err.message });
+    }
+  }
+);
+
+/**
+ * @desc Login user (Local)
+ * @route POST /users/login
+ */
+router.post(
+  '/login',
+  [body('email').isEmail(), body('password').notEmpty()],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty())
+      return res.status(400).json({ errors: errors.array() });
+
+    try {
+      const { email, password } = req.body;
+      const user = await User.findOne({ email });
+      if (!user) return res.status(400).json({ message: 'User not found' });
+
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch)
+        return res.status(400).json({ message: 'Invalid credentials' });
+
+      res.json({
+        message: '✅ Login successful',
+        user: { id: user._id, email: user.email }
+      });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ message: '❌ Error logging in', error: err.message });
+    }
+  }
+);
+
+/**
+ * @desc Update user
+ * @route PUT /users/:id
+ */
+router.put(
+  '/:id',
+  ensureAuth,
+  [
+    body('username').optional().notEmpty(),
+    body('email').optional().isEmail(),
+    body('password').optional().isLength({ min: 6 })
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty())
+      return res.status(400).json({ errors: errors.array() });
+
+    try {
+      const updates = { ...req.body };
+      if (updates.password) {
+        updates.password = await bcrypt.hash(updates.password, 10);
+      }
+
+      const updatedUser = await User.findByIdAndUpdate(
+        req.params.id,
+        updates,
+        { new: true }
+      );
+      if (!updatedUser) return res.status(404).json({ message: 'User not found' });
+
+      res.json({ message: '✅ User updated', user: updatedUser });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ message: '❌ Error updating user', error: err.message });
+    }
+  }
+);
+
+/**
+ * @desc Delete user
+ * @route DELETE /users/:id
+ */
+router.delete('/:id', ensureAuth, async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const deletedUser = await User.findByIdAndDelete(req.params.id);
+    if (!deletedUser) return res.status(404).json({ message: 'User not found' });
 
-    if (!username || !email || !password) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
-
-    // Check if user exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Save new user
-    const newUser = new User({
-      username,
-      email,
-      password: hashedPassword
-    });
-
-    await newUser.save();
-    res.status(201).json({ message: "✅ User registered successfully" });
+    res.json({ message: '✅ User deleted' });
   } catch (err) {
-    res.status(500).json({ message: "❌ Error registering user", error: err.message });
+    res
+      .status(500)
+      .json({ message: '❌ Error deleting user', error: err.message });
   }
 });
 
-// @desc Login user with Passport LocalStrategy
-// @route POST /users/login
-router.post('/login', (req, res, next) => {
-  passport.authenticate('local', (err, user, info) => {
-    if (err) return next(err);
-    if (!user) {
-      return res.status(400).json({ message: info?.message || "Login failed" });
-    }
+/**
+ * @desc Google OAuth login
+ * @route GET /users/auth/google
+ */
+router.get(
+  '/auth/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
 
-    req.logIn(user, (err) => {
-      if (err) return next(err);
-      return res.json({
-        message: "✅ Login successful",
-        user: { id: user._id, email: user.email, username: user.username }
-      });
-    });
-  })(req, res, next);
-});
+/**
+ * @desc Google OAuth callback
+ * @route GET /users/auth/google/callback
+ */
+router.get(
+  '/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/' }),
+  (req, res) => {
+    res.json({ message: '✅ Logged in with Google', user: req.user });
+  }
+);
 
-// @desc Logout user
-// @route GET /users/logout
+/**
+ * @desc Logout
+ * @route GET /users/logout
+ */
 router.get('/logout', (req, res) => {
   req.logout(() => {
-    res.json({ message: "✅ Logged out successfully" });
-  });
-});
-
-// @desc Protected profile route
-// @route GET /users/profile
-router.get('/profile', (req, res) => {
-  if (!req.isAuthenticated || !req.isAuthenticated()) {
-    return res.status(401).json({ message: "Unauthorized: Please log in" });
-  }
-  res.json({
-    message: "✅ Welcome to your profile",
-    user: req.user
+    res.json({ message: '✅ Logged out' });
   });
 });
 

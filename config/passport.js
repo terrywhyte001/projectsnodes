@@ -1,42 +1,65 @@
+// config/passport.js
 const LocalStrategy = require('passport-local').Strategy;
-const User = require('../models/user');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const User = require('../models/user'); // ✅ lowercase
 
 module.exports = function (passport) {
-  // Configure local strategy to use "email" instead of default "username"
+  // Local Strategy
   passport.use(
     new LocalStrategy({ usernameField: 'email' }, async (email, password, done) => {
       try {
-        const user = await User.findOne({ email: email.toLowerCase() }); // normalize email
-        if (!user) {
-          return done(null, false, { message: 'No user found with that email' });
-        }
+        const user = await User.findOne({ email });
+        if (!user) return done(null, false, { message: 'No user found' });
 
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-          return done(null, false, { message: 'Invalid credentials' });
-        }
+        if (!isMatch) return done(null, false, { message: 'Password incorrect' });
 
         return done(null, user);
       } catch (err) {
-        console.error('Error in Passport strategy:', err);
         return done(err);
       }
     })
   );
 
-  // Save only user id in session
+  // Google OAuth Strategy
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: '/users/auth/google/callback'
+      },
+      async (accessToken, refreshToken, profile, done) => {
+        try {
+          let user = await User.findOne({ email: profile.emails[0].value });
+
+          if (!user) {
+            user = await User.create({
+              username: profile.displayName,
+              email: profile.emails[0].value,
+              password: '', // no password for Google users
+              role: 'user'
+            });
+          }
+
+          return done(null, user);
+        } catch (err) {
+          return done(err, false);
+        }
+      }
+    )
+  );
+
   passport.serializeUser((user, done) => {
     done(null, user.id);
   });
 
-  // Restore user from id stored in session
-  passport.deserializeUser(async (id, done) => {
-    try {
-      const user = await User.findById(id);
-      done(null, user);
-    } catch (err) {
-      done(err);
-    }
+  passport.deserializeUser((id, done) => {
+    User.findById(id)
+      .then(user => done(null, user))
+      .catch(err => done(err));
   });
 };
+
