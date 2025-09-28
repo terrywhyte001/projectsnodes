@@ -1,8 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
-const itemRoutes = require('./routes/itemroutes'); // lowercase
-const userRoutes = require('./routes/userRoutes'); // lowercase
+const itemRoutes = require('./routes/itemroutes');   // lowercase
+const userRoutes = require('./routes/userroutes');   // lowercase
 const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger.json');
 const passport = require('passport');
