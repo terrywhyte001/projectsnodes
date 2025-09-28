@@ -1,18 +1,18 @@
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
-const itemRoutes = require('./routes/itemroutes');
-const userRoutes = require('./routes/userRoutes');
+const itemRoutes = require('./routes/itemRoutes'); // Correct capitalization
+const userRoutes = require('./routes/userRoutes'); // Correct capitalization
 const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger.json');
 const passport = require('passport');
 const session = require('express-session');
-require('./config/passport')(passport); // Your Passport Google OAuth config
+require('./config/passport')(passport); // Passport Google OAuth config
 
 const app = express();
 app.use(express.json());
 
-// Add session and passport middleware
+// Session and Passport middleware
 app.use(session({
   secret: process.env.SESSION_SECRET || 'secret',
   resave: false,
@@ -21,6 +21,7 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Port (Render will provide via env variable)
 const PORT = process.env.PORT || 3000;
 
 // Connect to MongoDB
